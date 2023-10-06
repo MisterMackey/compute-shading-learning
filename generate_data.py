@@ -1,3 +1,4 @@
+import pyarrow.parquet as pq
 import pyarrow as pa
 
 colNames = ['Id', 'Notional', 'Interest Rate', 'Interest Type', 'Start Date', 'Term', 'Remaining Notional', 'Payment Type', 'Risk Indicator']
@@ -15,7 +16,8 @@ def main():
 	data.append(['Annuity'])
 	data.append([0])
 	table = pa.table(data, names=colNames)
-	print([table])
+	
+	pq.write_table(table, "test_data.parquet", compression="snappy")
 
 if __name__ == '__main__':
 	main()
