@@ -43,3 +43,4 @@ I'll probably end up missing a few but:
 - vulkan
 - cmake
 - gcc/clang
+- python >= 3.10 for data generation
