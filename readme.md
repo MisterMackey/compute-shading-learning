@@ -9,7 +9,7 @@ schema:
 | Id	 | Unique identifier of contract |
 | Notional | Original notional value |
 | Interest Rate | The current interest rate expressed in annual rate, monthly accrual |
-| Start Date | ISO 8601 date field indicating the start of the contract |
+| Start Date | datetime field indicating the start of the contract |
 | Interest Type | Enumeration indicating when interest rates reset. Values: { Fixed / Var20 / Var15 / Var10 / Var9 / Var7 / Var5 }
 | Term | Duration in years of the contract |
 | Remaining Notional | Remaining amount on the loan |
