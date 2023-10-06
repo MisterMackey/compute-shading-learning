@@ -5,6 +5,7 @@ import pyarrow as pa
 import uuid
 import random
 
+NUM_ROWS_TO_GENERATE = 1000_000
 colNames = ['Id', 'Notional', 'Interest Rate', 'Interest Type', 'Start Date', 'Term', 'Remaining Notional', 'Payment Type', 'Risk Indicator']
 additionalInterestRatePerDuration = {
 	'Fixed': 2.0,
@@ -29,15 +30,17 @@ ASSUMED_DATE_TODAY=datetime(year=2023,month=1,day=1)
 def main():
 	data = []
 	#example
-	data.append(['Id1'])
-	data.append([400000])
-	data.append([2.0])
-	data.append(['Fixed'])
-	data.append(['2023-01-01'])
-	data.append([30])
-	data.append([400000])
-	data.append(['Annuity'])
-	data.append([0])
+	data.append([])
+	data.append([])
+	data.append([])
+	data.append([])
+	data.append([])
+	data.append([])
+	data.append([])
+	data.append([])
+	data.append([])
+	for i in range(1, NUM_ROWS_TO_GENERATE):
+		generate_row(data)
 	table = pa.table(data, names=colNames)
 	
 	pq.write_table(table, "test_data.parquet", compression="snappy")
@@ -46,7 +49,7 @@ def generate_id(num: int) -> List[str]:
         lst = []
         return lst
 
-def generate_row():
+def generate_row(target_list):
 	Id = str(uuid.uuid4())
 	Notional = random.randint(100000, 800000)
 	Term = random.choice([30, 25, 20])
@@ -69,6 +72,16 @@ def generate_row():
 	StartDate = datetime.today() - timedelta(days=randomDelta)
 	PaymentType = random.choice(['Annuity', 'Linear', 'Bullet'])
 	RemainingNotional = calc_remaining_notional(Notional, StartDate, InterestRisk, PaymentType, Term)
+	target_list[0].append(Id)
+	target_list[1].append(Notional)
+	target_list[2].append(InterestRisk)
+	target_list[3].append(InterestType)
+	target_list[4].append(StartDate)
+	target_list[5].append(Term)
+	target_list[6].append(RemainingNotional)
+	target_list[7].append(PaymentType)
+	target_list[8].append(RiskIndicator)
+
  
 def calc_remaining_notional(notional: int, start_date: datetime, interest: float, paytype: str, term: int) -> float:
 	match paytype:
