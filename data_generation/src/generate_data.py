@@ -82,7 +82,11 @@ def calc_remaining_notional(notional: int, start_date: datetime, interest: float
 			raise Exception("bruh moment")
 
 def calc_remaining_annuity(notional: int, start_date: datetime, interest: float, term: int) -> float:
-        return 1.0
+	months = (ASSUMED_DATE_TODAY.year - start_date.year) * 12 + ASSUMED_DATE_TODAY.month - start_date.month
+	monthsTotal = term * 12
+	r = interest / 12 / 100
+	payAmount = (notional*r*(pow(1+r, monthsTotal))) / (pow(1+r, monthsTotal) -1)
+	return notional * pow(1+r, months) - payAmount* ((pow(1+r, months) -1) / r)
 
 def calc_remaining_linear(notional: int, start_date: datetime, term: int) -> float:
 	months = (ASSUMED_DATE_TODAY.year - start_date.year) * 12 + ASSUMED_DATE_TODAY.month - start_date.month
