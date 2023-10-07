@@ -3,3 +3,4 @@
 test_data.parquet
 __pycache__
 .pytest_cache
+.ipynb_checkpoints/
