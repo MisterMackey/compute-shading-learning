@@ -34,6 +34,11 @@ Extra output showing defaulting rates, defaulting losses etc that can be drilled
 
 # description of model
 
+# solution types that will be benchmarked (i think):
+- GLSL + Vulkan
+- Python + PySpark
+- DotNet 8 (currently in preview)
+
 # what matters
 Create the model in both vulkan and some random CPU language (C# i guess) and benchmark it to the tits. The output doesn't matter (as long as it matches) but the speed difference does.
 
