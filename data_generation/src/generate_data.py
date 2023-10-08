@@ -4,18 +4,19 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 import uuid
 import random
+from math import floor
 
-NUM_ROWS_TO_GENERATE = 1000_000
-colNames = ['Id', 'Notional', 'Interest Rate', 'Interest Type', 'Start Date', 'Term', 'Remaining Notional', 'Payment Type', 'Risk Indicator']
+NUM_ROWS_TO_GENERATE = 1_000_000
+colNames = ['Id', 'Notional', 'Interest Rate', 'Reset Frequency', 'Start Date', 'Term', 'Remaining Notional', 'Payment Type', 'Risk Indicator', 'Next Reset Date']
 additionalInterestRatePerDuration = {
-	'Var30': 2.2,
-	'Var30': 1.9,
-	'Var20': 1.5,
-	'Var15': 1.0,
-	'Var10': 0.5,
-	'Var9': 0.4,
-	'Var7': 0.1,
-	'Var5': 0.0,
+	30: 2.2,
+	25: 1.9,
+	20: 1.5,
+	15: 1.0,
+	10: 0.5,
+	9: 0.4,
+	7: 0.1,
+	5: 0.0,
 
 }
 additionalInterestRatePerRiskCategory = {
@@ -40,9 +41,11 @@ def main():
 	data.append([])
 	data.append([])
 	data.append([])
-	for i in range(1, NUM_ROWS_TO_GENERATE):
+	data.append([])
+	for i in range(0, NUM_ROWS_TO_GENERATE):
 		generate_row(data)
 	table = pa.table(data, names=colNames)
+	print("{0} rows of data generated".format(len(table)))
 	
 	pq.write_table(table, "test_data.parquet", compression="snappy")
 
@@ -54,11 +57,19 @@ def generate_row(target_list):
 	Id = str(uuid.uuid4())
 	Notional = random.randint(100000, 800000)
 	Term = random.choice([30, 25, 20])
-	InterestType = random.choice(['Var30', 'Var25', 'Var20', 'Var15', 'Var10', 'Var9', 'Var7', 'Var5'])
-	if Term == 25 and InterestType == 'Var30':
-		InterestType = 'Var20'
-	if Term == 20 and (InterestType == 'Var25' or InterestType == 'Var30'):
-		InterestType = 'Var20'
+	randomDelta = random.randint(0, 365*25)
+	StartDate = datetime.today() - timedelta(days=randomDelta)
+	ResetFrequencyInYears = random.choice([30, 25, 20, 15, 10, 9, 7, 5])
+	NextResetDate = StartDate + timedelta(days=365*ResetFrequencyInYears)
+	if ASSUMED_DATE_TODAY > NextResetDate:
+		yearsLeft = Term - ResetFrequencyInYears
+		#find the smallest number in ordered list that is still larget than yearsLeft
+		ResetFrequencyInYears = [x for x in [30, 25, 20, 15, 10, 9, 7 ,5] if x >= yearsLeft][0]
+		NextResetDate = NextResetDate + timedelta(days=ResetFrequencyInYears*365)
+	if Term == 25 and ResetFrequencyInYears == 30:
+		ResetFrequencyInYears = 25
+	if Term == 20 and (ResetFrequencyInYears == 25 or ResetFrequencyInYears == 'Var30'):
+		ResetFrequencyInYears = 20
 	RiskIndicator = random.random()
 	if RiskIndicator < .8:
 		RiskIndicator = 0
@@ -70,20 +81,22 @@ def generate_row(target_list):
 		RiskIndicator = 3
 	else:
 		RiskIndicator = 4
-	InterestRisk = random.random() + .5 + additionalInterestRatePerRiskCategory[RiskIndicator] + additionalInterestRatePerDuration[InterestType]
-	randomDelta = random.randint(0, 365*25)
-	StartDate = datetime.today() - timedelta(days=randomDelta)
+	InterestRisk = random.random() + .5 + additionalInterestRatePerRiskCategory[RiskIndicator] + additionalInterestRatePerDuration[ResetFrequencyInYears]
 	PaymentType = random.choice(['Annuity', 'Linear', 'Bullet'])
+	#for annuity we assume the interest rates have not changed over the lifetime of the mortgage, which is innacurate if a rest has occurred but oh well
 	RemainingNotional = calc_remaining_notional(Notional, StartDate, InterestRisk, PaymentType, Term)
+
+         
 	target_list[0].append(Id)
 	target_list[1].append(Notional)
 	target_list[2].append(InterestRisk)
-	target_list[3].append(InterestType)
+	target_list[3].append(ResetFrequencyInYears)
 	target_list[4].append(StartDate)
 	target_list[5].append(Term)
 	target_list[6].append(RemainingNotional)
 	target_list[7].append(PaymentType)
 	target_list[8].append(RiskIndicator)
+	target_list[9].append(NextResetDate)
 
  
 def calc_remaining_notional(notional: int, start_date: datetime, interest: float, paytype: str, term: int) -> float:

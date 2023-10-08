@@ -15,6 +15,7 @@ schema:
 | Remaining Notional | Remaining amount on the loan |
 | Payment Type | Enumeration indicating repayment type. Values: { Annuity / Linear / Bullet }
 | Risk indicator | Number between 0 and 5 that indicates the probability of defaulting on the next payment, 5 implies a full default and write off of the mortgage with no recovery |
+| Next Reset Date | datetime field indicating the next time the interest rate will be re-determined
 
 Risk indicator may change from period to period based on a set of fixed probabilities given below:
 
