@@ -12,7 +12,7 @@ ENV SPARK_MASTER_PORT=7077 \
 	SPARK_WORKER_LOG=/opt/spark/logs/spark-worker.out \
 	SPARK_WORKER_WEBUI_PORT=8080 \
 	SPARK_WORKER_PORT=7000 \
-	SPARK_MASTER="spark://spark-master:9090" \
+	SPARK_MASTER="spark://spark-master:7077" \
 	SPARK_WORKLOAD="master"
 
 RUN mkdir /opt/spark/logs

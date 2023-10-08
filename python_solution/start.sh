@@ -14,6 +14,12 @@ then
 sleep 5
 /opt/spark/spark-3.5.0-bin-hadoop3/sbin/start-worker.sh $SPARK_MASTER
 
+elif [ "$SPARK_WORKLOAD" == "slave" ];
+then
+
+sleep 5
+/opt/spark/spark-3.5.0-bin-hadoop3/sbin/start-slave.sh $SPARK_MASTER
+
 else
 	echo "wut"
 fi

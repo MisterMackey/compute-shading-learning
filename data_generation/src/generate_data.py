@@ -8,7 +8,8 @@ import random
 NUM_ROWS_TO_GENERATE = 1000_000
 colNames = ['Id', 'Notional', 'Interest Rate', 'Interest Type', 'Start Date', 'Term', 'Remaining Notional', 'Payment Type', 'Risk Indicator']
 additionalInterestRatePerDuration = {
-	'Fixed': 2.0,
+	'Var30': 2.2,
+	'Var30': 1.9,
 	'Var20': 1.5,
 	'Var15': 1.0,
 	'Var10': 0.5,
@@ -53,9 +54,11 @@ def generate_row(target_list):
 	Id = str(uuid.uuid4())
 	Notional = random.randint(100000, 800000)
 	Term = random.choice([30, 25, 20])
-	InterestType = random.choice(['Fixed', 'Var20', 'Var15', 'Var10', 'Var9', 'Var7', 'Var5'])
-	if Term == 20 and InterestType == 'Var20':
-		InterestType = 'Fixed'
+	InterestType = random.choice(['Var30', 'Var25', 'Var20', 'Var15', 'Var10', 'Var9', 'Var7', 'Var5'])
+	if Term == 25 and InterestType == 'Var30':
+		InterestType = 'Var20'
+	if Term == 20 and (InterestType == 'Var25' or InterestType == 'Var30'):
+		InterestType = 'Var20'
 	RiskIndicator = random.random()
 	if RiskIndicator < .8:
 		RiskIndicator = 0

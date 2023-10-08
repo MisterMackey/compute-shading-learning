@@ -24,10 +24,10 @@ services:
       - driver
     environment:
       - SPARK_MASTER=spark://driver:7077
-      - SPARK_WORKER_CORES=4
-      - SPARK_WORKER_MEMORY=4G
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
       - SPARK_DRIVER_MEMORY=1G
-      - SPARK_EXECUTOR_MEMORY=3G
+      - SPARK_EXECUTOR_MEMORY=1G
       - SPARK_WORKLOAD=worker
       - SPARK_LOCAL_IP=worker-1
     volumes:
@@ -44,8 +44,8 @@ services:
       - driver
     environment:
       - SPARK_MASTER=spark://driver:7077
-      - SPARK_WORKER_CORES=4
-      - SPARK_WORKER_MEMORY=4G
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
       - SPARK_DRIVER_MEMORY=1G
       - SPARK_EXECUTOR_MEMORY=3G
       - SPARK_WORKLOAD=worker
