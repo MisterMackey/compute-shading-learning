@@ -7,7 +7,7 @@ import random
 from math import floor
 
 NUM_ROWS_TO_GENERATE = 1_000_000
-colNames = ['Id', 'Notional', 'Interest Rate', 'Reset Frequency', 'Start Date', 'Term', 'Remaining Notional', 'Payment Type', 'Risk Indicator', 'Next Reset Date']
+colNames = ['Id', 'Notional', 'Interest_Rate', 'Reset_Frequency', 'Start_Date', 'Term', 'Remaining_Notional', 'Payment_Type', 'Risk_Indicator', 'Next_Reset_Date']
 additionalInterestRatePerDuration = {
 	30: 2.2,
 	25: 1.9,
