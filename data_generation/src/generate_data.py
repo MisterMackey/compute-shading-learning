@@ -57,14 +57,14 @@ def generate_row(target_list):
 	Id = str(uuid.uuid4())
 	Notional = random.randint(100000, 800000)
 	Term = random.choice([30, 25, 20])
-	randomDelta = random.randint(0, 365*25)
+	randomDelta = random.randint(0, 365*Term-1)
 	StartDate = datetime.today() - timedelta(days=randomDelta)
 	ResetFrequencyInYears = random.choice([30, 25, 20, 15, 10, 9, 7, 5])
+	ResetFrequencyInYears = min(ResetFrequencyInYears, Term)
 	NextResetDate = StartDate + timedelta(days=365*ResetFrequencyInYears)
 	if ASSUMED_DATE_TODAY > NextResetDate:
 		yearsLeft = Term - ResetFrequencyInYears
-		#find the smallest number in ordered list that is still larget than yearsLeft
-		ResetFrequencyInYears = [x for x in [30, 25, 20, 15, 10, 9, 7 ,5] if x >= yearsLeft][0]
+		ResetFrequencyInYears = min([x for x in [30, 25, 20, 15, 10, 9, 7 ,5] if x >= yearsLeft])
 		NextResetDate = NextResetDate + timedelta(days=ResetFrequencyInYears*365)
 	if Term == 25 and ResetFrequencyInYears == 30:
 		ResetFrequencyInYears = 25
