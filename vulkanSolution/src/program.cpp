@@ -8,6 +8,9 @@
 #include <array>
 #include <vulkan/vk_platform.h>
 #include <vulkan/vulkan_core.h>
+#include "record.hpp"
+
+using namespace mortgage_record;
 
 #ifndef NDEBUG
 const bool enable_validation_layer = true;
@@ -35,6 +38,8 @@ Program::Program(int argc, char **argv)
 
 Program::~Program()
 {
+	vkDestroyPipeline(logical_device, compute_pipeline, nullptr);
+	vkDestroyPipelineLayout(logical_device, pipeline_layout, nullptr);
 	vkDestroyDescriptorSetLayout(logical_device, descriptor_set_layout, nullptr);
 	vkDestroyDevice(logical_device, nullptr);
 	vkDestroyInstance(instance, nullptr);
@@ -150,12 +155,22 @@ void Program::create_compute_pipeline()
 	VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
 	pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipeline_layout_create_info.setLayoutCount = 1;
-	pipeline_layout_create_info.pSetLayouts = nullptr; //TODO: create computedescriptorsetlayout with layoutbindings after the shader is written
+	pipeline_layout_create_info.pSetLayouts = &descriptor_set_layout;
+
+	result = vkCreatePipelineLayout(logical_device, &pipeline_layout_create_info, nullptr, &pipeline_layout);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create pipeline layout");
+	}
 
 	VkComputePipelineCreateInfo pipeline_create_info = {};
 	pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 	pipeline_create_info.stage = shader_stage_create_info;
+	pipeline_create_info.layout = pipeline_layout;
 
+	result = vkCreateComputePipelines(logical_device, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &compute_pipeline);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create compute pipeline");
+	}
 }
 
 void Program::create_descriptor_set_layout()

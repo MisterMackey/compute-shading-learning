@@ -27,4 +27,8 @@ class Program
 	VkPhysicalDevice physical_device;
 	VkQueue compute_queue;
 	VkDescriptorSetLayout descriptor_set_layout;
+	VkPipelineLayout pipeline_layout;
+	VkPipeline compute_pipeline;
+	//VkBuffer data_buffer;
+	//VkDeviceMemory data_buffer_memory;
 };
