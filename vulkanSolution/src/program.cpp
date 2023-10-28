@@ -33,7 +33,7 @@ Program::Program(int argc, char **argv)
 	get_physical_device();
 	create_logical_device();
 	create_descriptor_set_layout();
-	//next up: create pipeline? and buffers for the data and bind that to stuff..
+	create_compute_pipeline();
 }
 
 Program::~Program()
@@ -88,6 +88,8 @@ void Program::get_physical_device()
 	for (const auto &device : devices) {
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(device, &deviceProperties);
+		VkPhysicalDeviceFeatures deviceFeatures = {};
+		vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 		std::cout << "Found device: " << deviceProperties.deviceName << " with limits:" << std::endl;
 		std::cout << "\tWorkGroupCount: [" << deviceProperties.limits.maxComputeWorkGroupCount[0] << "], ["
 			  << deviceProperties.limits.maxComputeWorkGroupCount[1] << "], [" << deviceProperties.limits.maxComputeWorkGroupCount[2] << "]"
@@ -96,6 +98,10 @@ void Program::get_physical_device()
 			  << deviceProperties.limits.maxComputeWorkGroupSize[1] << "], [" << deviceProperties.limits.maxComputeWorkGroupSize[2] << "]"
 			  << std::endl;
 		std::cout << "\tWorkGroupInvocations: [" << deviceProperties.limits.maxComputeWorkGroupInvocations << "]" << std::endl;
+		//check for float64 support
+		if (!deviceFeatures.shaderFloat64) {
+			throw std::runtime_error("Device does not support float64, aborting");
+		}
 		// picking the last and only device here cuz im lazy and i only got the one GPU anyway
 		physical_device = device;
 	}
@@ -116,6 +122,8 @@ void Program::create_logical_device()
 	float queuePriority = 1.0f;
 	queueCreateInfo.pQueuePriorities = &queuePriority;
 	VkPhysicalDeviceFeatures deviceFeatures = {};
+	//enable float64
+	deviceFeatures.shaderFloat64 = VK_TRUE;
 	VkDeviceCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	createInfo.pQueueCreateInfos = &queueCreateInfo;
@@ -135,7 +143,7 @@ void Program::create_logical_device()
 void Program::create_compute_pipeline()
 {
 	//Create the compute shader module
-	auto computeShaderCode = read_shader_file("shaders/comp.spv");
+	auto computeShaderCode = read_shader_file("shaders/mortgage.comp.spv");
 	VkShaderModuleCreateInfo shader_create_info = {};
 	shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	shader_create_info.codeSize = computeShaderCode.size();
@@ -171,6 +179,8 @@ void Program::create_compute_pipeline()
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create compute pipeline");
 	}
+
+	vkDestroyShaderModule(logical_device, shaderModule, nullptr);
 }
 
 void Program::create_descriptor_set_layout()
