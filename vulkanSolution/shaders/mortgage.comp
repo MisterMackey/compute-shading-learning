@@ -1,0 +1,39 @@
+#version 450
+
+struct Record {
+	double index;
+	float interest_rate;
+	float remaining_notional;
+	float monthly_payment;
+	float repayment_payment;
+	float interest_payment;
+	float write_off;
+	int reset_frequency;
+	int risk_indicator;
+	int curr_date_offset;
+	int next_reset_date_offset;
+	int max_date_offset;
+	int payment_type;
+};
+
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, binding = 0) buffer Records {
+	Record records[];
+};
+
+void main()
+{
+	uint index = gl_GlobalInvocationID.x;
+
+	// Check if index is out of bounds, this might happen if the number of records is not a multiple of the local size
+	if (index >= records.length()) {
+		return;
+	}
+
+	Record record = records[index];
+	// i guess put all the updates and stuff below and write it right back to the buffer
+	// after that we read it back out at the CPU side and then send the next invocation which can conveniently operate on the same buffer
+	// maybe i can experiment with keeping the working set in high perf memory and transferring a copy out to host visiable memory so the next 'frame'
+	// can run while im writing it on the cpu side
+}

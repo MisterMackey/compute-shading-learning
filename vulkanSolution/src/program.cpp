@@ -1,14 +1,17 @@
 #include "program.hpp"
-#include <fstream>
+#include "parquet_loader.hpp"
+#include "record.hpp"
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
-#include <array>
 #include <vulkan/vk_platform.h>
 #include <vulkan/vulkan_core.h>
-#include "record.hpp"
 
 using namespace mortgage_record;
 
@@ -22,6 +25,8 @@ const std::vector<const char *> validation_layers = {
     "VK_LAYER_KHRONOS_validation",
 };
 
+const std::string PARQUET_FILE_PATH = "../test_data.parquet";
+
 Program::Program(int argc, char **argv)
 {
 	this->argc = argc;
@@ -34,10 +39,14 @@ Program::Program(int argc, char **argv)
 	create_logical_device();
 	create_descriptor_set_layout();
 	create_compute_pipeline();
+	load_parquet();
+	create_buffer(parquet_table->num_rows());
 }
 
 Program::~Program()
 {
+	vkFreeMemory(logical_device, data_buffer_memory, nullptr);
+	vkDestroyBuffer(logical_device, data_buffer, nullptr);
 	vkDestroyPipeline(logical_device, compute_pipeline, nullptr);
 	vkDestroyPipelineLayout(logical_device, pipeline_layout, nullptr);
 	vkDestroyDescriptorSetLayout(logical_device, descriptor_set_layout, nullptr);
@@ -98,7 +107,7 @@ void Program::get_physical_device()
 			  << deviceProperties.limits.maxComputeWorkGroupSize[1] << "], [" << deviceProperties.limits.maxComputeWorkGroupSize[2] << "]"
 			  << std::endl;
 		std::cout << "\tWorkGroupInvocations: [" << deviceProperties.limits.maxComputeWorkGroupInvocations << "]" << std::endl;
-		//check for float64 support
+		// check for float64 support
 		if (!deviceFeatures.shaderFloat64) {
 			throw std::runtime_error("Device does not support float64, aborting");
 		}
@@ -122,7 +131,7 @@ void Program::create_logical_device()
 	float queuePriority = 1.0f;
 	queueCreateInfo.pQueuePriorities = &queuePriority;
 	VkPhysicalDeviceFeatures deviceFeatures = {};
-	//enable float64
+	// enable float64
 	deviceFeatures.shaderFloat64 = VK_TRUE;
 	VkDeviceCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -142,7 +151,7 @@ void Program::create_logical_device()
 
 void Program::create_compute_pipeline()
 {
-	//Create the compute shader module
+	// Create the compute shader module
 	auto computeShaderCode = read_shader_file("shaders/mortgage.comp.spv");
 	VkShaderModuleCreateInfo shader_create_info = {};
 	shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -203,7 +212,7 @@ void Program::create_descriptor_set_layout()
 	}
 }
 
-std::vector<char> Program::read_shader_file(const std::string& file_name)
+std::vector<char> Program::read_shader_file(const std::string &file_name)
 {
 	std::ifstream file(file_name, std::ios::ate | std::ios::binary);
 	if (!file.is_open()) {
@@ -215,4 +224,64 @@ std::vector<char> Program::read_shader_file(const std::string& file_name)
 	file.read(buffer.data(), fileSize);
 	file.close();
 	return buffer;
+}
+
+void Program::create_buffer(size_t record_count)
+{
+	// todo: CHECK THIS WHOLE METHOD
+	VkBufferCreateInfo buffer_create_info = {};
+	buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_create_info.size = sizeof(record) * record_count;
+	buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	// not settings flags, wasn't needed in tutorial and results in validation errors so guess leave it empty
+
+	auto result = vkCreateBuffer(logical_device, &buffer_create_info, nullptr, &data_buffer);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create buffer");
+	}
+
+	VkMemoryRequirements memory_requirements = {};
+	memory_requirements.size = sizeof(record) * record_count;
+	vkGetBufferMemoryRequirements(logical_device, data_buffer, &memory_requirements);
+
+	VkPhysicalDeviceMemoryProperties memory_properties = {};
+	vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+
+	VkMemoryAllocateInfo memory_allocate_info = {};
+	memory_allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memory_allocate_info.allocationSize = memory_requirements.size;
+	// for loop is probably more readable here?
+	//  if not, forgive me for i have sinned
+	bool err = true;
+	for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
+		bool type_suitable = memory_requirements.memoryTypeBits & (1 << i);
+		bool property_suitable =
+		    memory_properties.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		if (type_suitable && property_suitable) {
+			memory_allocate_info.memoryTypeIndex = i;
+			err = false;
+			break;
+		}
+	}
+	if (err) {
+		throw std::runtime_error("Failed to find suitable memory type");
+	}
+
+	result = vkAllocateMemory(logical_device, &memory_allocate_info, nullptr, &data_buffer_memory);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to allocate buffer memory");
+	}
+
+	vkBindBufferMemory(logical_device, data_buffer, data_buffer_memory, 0);
+}
+
+void Program::load_parquet()
+{
+	std::cout << "Loading: " << PARQUET_FILE_PATH << std::endl;
+	auto result = parquet_loading::load_parquet_file(PARQUET_FILE_PATH, &parquet_table);
+	if (result != arrow::Status::OK()) {
+		throw std::runtime_error("Failed to load parquet file");
+	}
+	std::cout << "loaded " << parquet_table->num_rows() << " records" << std::endl;
 }

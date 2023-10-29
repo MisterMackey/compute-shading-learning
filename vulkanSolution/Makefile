@@ -179,6 +179,30 @@ src/main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/MortgageCalc.dir/build.make CMakeFiles/MortgageCalc.dir/src/main.cpp.s
 .PHONY : src/main.cpp.s
 
+src/parquet_loader.o: src/parquet_loader.cpp.o
+.PHONY : src/parquet_loader.o
+
+# target to build an object file
+src/parquet_loader.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MortgageCalc.dir/build.make CMakeFiles/MortgageCalc.dir/src/parquet_loader.cpp.o
+.PHONY : src/parquet_loader.cpp.o
+
+src/parquet_loader.i: src/parquet_loader.cpp.i
+.PHONY : src/parquet_loader.i
+
+# target to preprocess a source file
+src/parquet_loader.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MortgageCalc.dir/build.make CMakeFiles/MortgageCalc.dir/src/parquet_loader.cpp.i
+.PHONY : src/parquet_loader.cpp.i
+
+src/parquet_loader.s: src/parquet_loader.cpp.s
+.PHONY : src/parquet_loader.s
+
+# target to generate assembly for a file
+src/parquet_loader.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MortgageCalc.dir/build.make CMakeFiles/MortgageCalc.dir/src/parquet_loader.cpp.s
+.PHONY : src/parquet_loader.cpp.s
+
 src/program.o: src/program.cpp.o
 .PHONY : src/program.o
 
@@ -217,6 +241,9 @@ help:
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
+	@echo "... src/parquet_loader.o"
+	@echo "... src/parquet_loader.i"
+	@echo "... src/parquet_loader.s"
 	@echo "... src/program.o"
 	@echo "... src/program.i"
 	@echo "... src/program.s"

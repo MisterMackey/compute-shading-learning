@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.16)
 project(MortgageCalc)
 
 set(CMAKE_CXX_COMPILER clang++)
@@ -10,6 +10,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -D_LIBCPP_DEBUG2 -fsanitize=
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 add_link_options(-lvulkan -lpthread)
+find_package(Arrow REQUIRED)
+find_package(Parquet REQUIRED)
 
 #add glsl shader source files
 file(GLOB_RECURSE GLSL_SOURCE_FILES
@@ -35,6 +37,8 @@ add_custom_target(Shaders DEPENDS ${SPIRV_BINARY_FILES})
 file(GLOB SOURCES "src/*.cpp")
 add_executable(MortgageCalc ${SOURCES})
 add_dependencies(MortgageCalc Shaders)
+target_link_libraries(MortgageCalc PRIVATE Arrow::arrow_shared)
+target_link_libraries(MortgageCalc PRIVATE Parquet::parquet_shared)
 
 add_custom_target(test
 	COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target MortgageCalc
