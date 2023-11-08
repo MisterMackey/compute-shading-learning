@@ -41,6 +41,7 @@ Program::Program(int argc, char **argv)
 	create_compute_pipeline();
 	load_parquet();
 	create_buffer(parquet_table->num_rows());
+	parquet_loading::transform_data_to_arrays(parquet_table, guid_vec, record_vec);
 }
 
 Program::~Program()
@@ -284,4 +285,5 @@ void Program::load_parquet()
 		throw std::runtime_error("Failed to load parquet file");
 	}
 	std::cout << "loaded " << parquet_table->num_rows() << " records" << std::endl;
+	std::cout << parquet_table->schema()->ToString(true);
 }
