@@ -27,7 +27,12 @@ class Program
 	void create_buffer(size_t record_count);
 	void load_parquet(void);
 	void transform_data(void);
+	void copyDataToBufferMemory(void);
 	std::vector<char> read_shader_file(const std::string &filename);
+	void calculate_next_set(void);
+	void copy_from_buffer(void);
+	void write_output(void);
+	void create_command_buffer(void);
 	int argc;
 	char** argv;
 	VkInstance instance;
@@ -42,4 +47,7 @@ class Program
 	std::shared_ptr<arrow::Table> parquet_table;
 	std::vector<std::string> guid_vec;
 	std::vector<mortgage_record::record> record_vec;
+	std::vector<mortgage_record::record> output_vec;
+	VkCommandBuffer command_buffer;
+	VkCommandPool command_pool;
 };

@@ -26,6 +26,9 @@ const std::vector<const char *> validation_layers = {
 };
 
 const std::string PARQUET_FILE_PATH = "../test_data.parquet";
+// this controls how many records are kept in the result set before a write is triggered.
+// after a write the memory can be reused
+const size_t MAX_BYTES_FOR_RESULT_SET = 10l * 1024l * 1024l * 1024l;
 
 Program::Program(int argc, char **argv)
 {
@@ -39,13 +42,18 @@ Program::Program(int argc, char **argv)
 	create_logical_device();
 	create_descriptor_set_layout();
 	create_compute_pipeline();
+	create_command_buffer();
 	load_parquet();
 	create_buffer(parquet_table->num_rows());
 	parquet_loading::transform_data_to_arrays(parquet_table, guid_vec, record_vec);
+	// free the memory as this table is no longer needed
+	parquet_table.reset();
 }
 
 Program::~Program()
 {
+	vkFreeCommandBuffers(logical_device, command_pool, 1, &command_buffer);
+	vkDestroyCommandPool(logical_device, command_pool, nullptr);
 	vkFreeMemory(logical_device, data_buffer_memory, nullptr);
 	vkDestroyBuffer(logical_device, data_buffer, nullptr);
 	vkDestroyPipeline(logical_device, compute_pipeline, nullptr);
@@ -57,7 +65,31 @@ Program::~Program()
 
 void Program::run()
 {
-	// run implementation
+	copyDataToBufferMemory();
+	// resize the output vector to its maximum allowed size, we can shrink at the end if needed
+	//  its resized to the amount of full sets, as each pass through the shader will get a full set of size record_vec.size() * sizeof(record)
+	size_t allowed_sets = MAX_BYTES_FOR_RESULT_SET / (sizeof(record) * record_vec.size());
+	size_t output_vec_size = allowed_sets * record_vec.size();
+	output_vec.resize(output_vec_size);
+	// find the maximum date offset in the record vec
+	auto max_date_offset =
+	    std::max_element(record_vec.begin(), record_vec.end(), [](const record &a, const record &b) { return a.max_date_offset < b.max_date_offset; });
+	// max_date_offset->max_date_offset is the maximum date offset in the output vec, we can use this as a bound on the for loop
+	if (max_date_offset->max_date_offset < 0) {
+		throw std::runtime_error("Max date offset is negative, aborting"); // just in case since we are throwing the sign away
+	}
+	size_t iteration_count = static_cast<size_t>(max_date_offset->max_date_offset);
+	for (size_t i = 0; i < iteration_count; i++) {
+		// compute next set, take it out of the buffer, copy it to output_vec.
+		calculate_next_set();
+		copy_from_buffer();
+		// check if we are at the max allowed sets, if so we trigger a write and clear the vector
+		if (i == allowed_sets) {
+			write_output();
+			output_vec.clear();
+		}
+	}
+	write_output();
 }
 
 void Program::create_vkInstance()
@@ -285,5 +317,60 @@ void Program::load_parquet()
 		throw std::runtime_error("Failed to load parquet file");
 	}
 	std::cout << "loaded " << parquet_table->num_rows() << " records" << std::endl;
-	std::cout << parquet_table->schema()->ToString(true);
+	std::cout << parquet_table->schema()->ToString(true) << std::endl;
+}
+
+void Program::copyDataToBufferMemory()
+{
+	void *data;
+	vkMapMemory(logical_device, data_buffer_memory, 0, sizeof(record) * record_vec.size(), 0, &data);
+	memcpy(data, record_vec.data(), sizeof(record) * record_vec.size());
+	vkUnmapMemory(logical_device, data_buffer_memory);
+}
+
+void Program::create_command_buffer()
+{
+	uint32_t queue_family_count;
+	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
+	std::vector<VkQueueFamilyProperties> queueFamilies(queue_family_count);
+	vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queueFamilies.data());
+	auto compute_queue_index =
+	    std::find_if(queueFamilies.begin(), queueFamilies.end(), [](const VkQueueFamilyProperties &qfp) { return qfp.queueFlags & VK_QUEUE_COMPUTE_BIT; });
+	size_t index = static_cast<size_t>(std::distance(queueFamilies.begin(), compute_queue_index));
+
+	VkCommandPoolCreateInfo command_pool_create_info = {};
+	command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	command_pool_create_info.queueFamilyIndex = index;
+	command_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+	auto result = vkCreateCommandPool(logical_device, &command_pool_create_info, nullptr, &command_pool);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create command pool");
+	}
+
+	VkCommandBufferAllocateInfo command_buffer_allocate_info = {};
+	command_buffer_allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	command_buffer_allocate_info.commandPool = command_pool;
+	command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	command_buffer_allocate_info.commandBufferCount = 1;
+
+	result = vkAllocateCommandBuffers(logical_device, &command_buffer_allocate_info, &command_buffer);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to allocate command buffer");
+	}
+}
+
+void Program::calculate_next_set()
+{
+
+}
+
+void Program::write_output()
+{
+
+}
+
+void Program::copy_from_buffer()
+{
+
 }
