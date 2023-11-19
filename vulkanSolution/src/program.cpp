@@ -41,10 +41,10 @@ Program::Program(int argc, char **argv)
 	get_physical_device();
 	create_logical_device();
 	create_descriptor_set_layout();
-	create_descriptor_set();
 	create_compute_pipeline();
 	create_command_buffer();
 	create_descriptor_pool();
+	create_descriptor_set();
 	load_parquet();
 	create_buffer(parquet_table->num_rows());
 	parquet_loading::transform_data_to_arrays(parquet_table, guid_vec, record_vec);
@@ -365,6 +365,7 @@ void Program::create_command_buffer()
 
 void Program::calculate_next_set()
 {
+	return;
 	VkCommandBufferBeginInfo command_buffer_begin_info = {};
 	command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	if (vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info) != VK_SUCCESS) {

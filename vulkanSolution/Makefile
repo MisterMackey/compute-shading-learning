@@ -155,6 +155,30 @@ test/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test.dir/build.make CMakeFiles/test.dir/build
 .PHONY : test/fast
 
+src/dispatcher.o: src/dispatcher.cpp.o
+.PHONY : src/dispatcher.o
+
+# target to build an object file
+src/dispatcher.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MortgageCalc.dir/build.make CMakeFiles/MortgageCalc.dir/src/dispatcher.cpp.o
+.PHONY : src/dispatcher.cpp.o
+
+src/dispatcher.i: src/dispatcher.cpp.i
+.PHONY : src/dispatcher.i
+
+# target to preprocess a source file
+src/dispatcher.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MortgageCalc.dir/build.make CMakeFiles/MortgageCalc.dir/src/dispatcher.cpp.i
+.PHONY : src/dispatcher.cpp.i
+
+src/dispatcher.s: src/dispatcher.cpp.s
+.PHONY : src/dispatcher.s
+
+# target to generate assembly for a file
+src/dispatcher.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MortgageCalc.dir/build.make CMakeFiles/MortgageCalc.dir/src/dispatcher.cpp.s
+.PHONY : src/dispatcher.cpp.s
+
 src/main.o: src/main.cpp.o
 .PHONY : src/main.o
 
@@ -238,6 +262,9 @@ help:
 	@echo "... Shaders"
 	@echo "... test"
 	@echo "... MortgageCalc"
+	@echo "... src/dispatcher.o"
+	@echo "... src/dispatcher.i"
+	@echo "... src/dispatcher.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
