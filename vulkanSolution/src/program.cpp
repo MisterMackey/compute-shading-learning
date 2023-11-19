@@ -41,8 +41,10 @@ Program::Program(int argc, char **argv)
 	get_physical_device();
 	create_logical_device();
 	create_descriptor_set_layout();
+	create_descriptor_set();
 	create_compute_pipeline();
 	create_command_buffer();
+	create_descriptor_pool();
 	load_parquet();
 	create_buffer(parquet_table->num_rows());
 	parquet_loading::transform_data_to_arrays(parquet_table, guid_vec, record_vec);
@@ -52,6 +54,7 @@ Program::Program(int argc, char **argv)
 
 Program::~Program()
 {
+	vkDestroyDescriptorPool(logical_device, descriptor_pool, nullptr);
 	vkFreeCommandBuffers(logical_device, command_pool, 1, &command_buffer);
 	vkDestroyCommandPool(logical_device, command_pool, nullptr);
 	vkFreeMemory(logical_device, data_buffer_memory, nullptr);
@@ -362,7 +365,14 @@ void Program::create_command_buffer()
 
 void Program::calculate_next_set()
 {
-
+	VkCommandBufferBeginInfo command_buffer_begin_info = {};
+	command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	if (vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to begin recording command buffer");
+	}
+	vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline);
+	//figure out how to make this descriptor sets again
+	vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
 }
 
 void Program::write_output()
@@ -373,4 +383,55 @@ void Program::write_output()
 void Program::copy_from_buffer()
 {
 
+}
+
+void Program::create_descriptor_pool()
+{
+	VkDescriptorPoolSize pool_size = {};
+	pool_size.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	pool_size.descriptorCount = 1;
+
+	VkDescriptorPoolCreateInfo pool_create_info = {};
+	pool_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	pool_create_info.poolSizeCount = 1;
+	pool_create_info.pPoolSizes = &pool_size;
+	pool_create_info.maxSets = 1;
+	pool_create_info.flags = 0; //this can be set optionally to allow freeing of individual descriptor sets if needed
+
+	auto result = vkCreateDescriptorPool(logical_device, &pool_create_info, nullptr, &descriptor_pool);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create descriptor pool");
+	}
+}
+
+void Program::create_descriptor_set()
+{
+	VkDescriptorSetAllocateInfo descriptor_set_allocate_info = {};
+	descriptor_set_allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descriptor_set_allocate_info.descriptorPool = descriptor_pool;
+	descriptor_set_allocate_info.descriptorSetCount = 1;
+	descriptor_set_allocate_info.pSetLayouts = &descriptor_set_layout;
+
+	auto result = vkAllocateDescriptorSets(logical_device, &descriptor_set_allocate_info, &descriptor_set);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to allocate descriptor set");
+	}
+	// does not need to be freed explicitly, freed when descriptor pool is freed
+
+	//at this point the objects are allocated but not configured
+	// you would run something like the below for each descriptor set but we only have one
+	VkDescriptorBufferInfo buffer_info = {};
+	buffer_info.buffer = data_buffer;
+	buffer_info.offset = 0;
+	buffer_info.range = VK_WHOLE_SIZE;
+	VkWriteDescriptorSet descriptor_write = {};
+	descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptor_write.dstSet = descriptor_set;
+	descriptor_write.dstBinding = 0;
+	descriptor_write.dstArrayElement = 0;
+	descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	descriptor_write.descriptorCount = 1;
+	descriptor_write.pBufferInfo = &buffer_info;
+
+	vkUpdateDescriptorSets(logical_device, 1, &descriptor_write, 0, nullptr);
 }

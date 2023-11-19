@@ -33,6 +33,8 @@ class Program
 	void copy_from_buffer(void);
 	void write_output(void);
 	void create_command_buffer(void);
+	void create_descriptor_pool(void);
+	void create_descriptor_set(void);
 	int argc;
 	char** argv;
 	VkInstance instance;
@@ -50,4 +52,6 @@ class Program
 	std::vector<mortgage_record::record> output_vec;
 	VkCommandBuffer command_buffer;
 	VkCommandPool command_pool;
+	VkDescriptorPool descriptor_pool;
+	VkDescriptorSet descriptor_set;
 };
