@@ -35,6 +35,7 @@ class Program
 	void create_command_buffer(void);
 	void create_descriptor_pool(void);
 	void create_descriptor_set(void);
+	void create_sync_objects(void);
 	int argc;
 	char** argv;
 	VkInstance instance;
@@ -54,4 +55,5 @@ class Program
 	VkCommandPool command_pool;
 	VkDescriptorPool descriptor_pool;
 	VkDescriptorSet descriptor_set;
+	VkFence fence_compute_finish;
 };

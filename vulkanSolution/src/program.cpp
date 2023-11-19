@@ -3,6 +3,7 @@
 #include "record.hpp"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -44,9 +45,9 @@ Program::Program(int argc, char **argv)
 	create_compute_pipeline();
 	create_command_buffer();
 	create_descriptor_pool();
-	create_descriptor_set();
 	load_parquet();
 	create_buffer(parquet_table->num_rows());
+	create_descriptor_set();
 	parquet_loading::transform_data_to_arrays(parquet_table, guid_vec, record_vec);
 	// free the memory as this table is no longer needed
 	parquet_table.reset();
@@ -54,6 +55,7 @@ Program::Program(int argc, char **argv)
 
 Program::~Program()
 {
+	vkDestroyFence(logical_device, fence_compute_finish, nullptr);
 	vkDestroyDescriptorPool(logical_device, descriptor_pool, nullptr);
 	vkFreeCommandBuffers(logical_device, command_pool, 1, &command_buffer);
 	vkDestroyCommandPool(logical_device, command_pool, nullptr);
@@ -365,6 +367,7 @@ void Program::create_command_buffer()
 
 void Program::calculate_next_set()
 {
+	//todo: maybe reuse this command buffer?
 	return;
 	VkCommandBufferBeginInfo command_buffer_begin_info = {};
 	command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -374,6 +377,17 @@ void Program::calculate_next_set()
 	vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline);
 	//figure out how to make this descriptor sets again
 	vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
+	size_t work_group_count = std::ceil(record_vec.size() / 1024);
+	vkCmdDispatch(command_buffer, work_group_count, 1, 1);
+
+	auto result = vkEndCommandBuffer(command_buffer);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to record command buffer");
+	}
+	//todo: handle synchronization
+
+	VkSubmitInfo submit_info = {};
+	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 }
 
 void Program::write_output()
@@ -435,4 +449,17 @@ void Program::create_descriptor_set()
 	descriptor_write.pBufferInfo = &buffer_info;
 
 	vkUpdateDescriptorSets(logical_device, 1, &descriptor_write, 0, nullptr);
+}
+
+void Program::create_sync_objects()
+{
+	//create a fence
+	VkFenceCreateInfo fence_create_info = {};
+	fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	auto result = vkCreateFence(logical_device, &fence_create_info, nullptr, &fence_compute_finish);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create fence");
+	}
 }
