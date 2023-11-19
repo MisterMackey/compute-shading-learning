@@ -45,6 +45,7 @@ Program::Program(int argc, char **argv)
 	create_compute_pipeline();
 	create_command_buffer();
 	create_descriptor_pool();
+	create_sync_objects();
 	load_parquet();
 	create_buffer(parquet_table->num_rows());
 	create_descriptor_set();
@@ -87,6 +88,7 @@ void Program::run()
 	for (size_t i = 0; i < iteration_count; i++) {
 		// compute next set, take it out of the buffer, copy it to output_vec.
 		calculate_next_set();
+		vkWaitForFences(logical_device, 1, &fence_compute_finish, VK_TRUE, UINT64_MAX);
 		copy_from_buffer();
 		// check if we are at the max allowed sets, if so we trigger a write and clear the vector
 		if (i == allowed_sets) {
@@ -367,8 +369,9 @@ void Program::create_command_buffer()
 
 void Program::calculate_next_set()
 {
+	vkWaitForFences(logical_device, 1, &fence_compute_finish, VK_TRUE, UINT64_MAX);
+	vkResetFences(logical_device, 1, &fence_compute_finish);
 	//todo: maybe reuse this command buffer?
-	return;
 	VkCommandBufferBeginInfo command_buffer_begin_info = {};
 	command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	if (vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info) != VK_SUCCESS) {
@@ -388,6 +391,19 @@ void Program::calculate_next_set()
 
 	VkSubmitInfo submit_info = {};
 	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit_info.commandBufferCount = 1;
+	submit_info.waitSemaphoreCount = 0; //todo: is this correct for single buffer? def need one for multibuffer setup
+	submit_info.pWaitSemaphores = VK_NULL_HANDLE;
+	submit_info.pWaitDstStageMask = VK_NULL_HANDLE;
+	submit_info.signalSemaphoreCount = 0;
+	submit_info.pSignalSemaphores = VK_NULL_HANDLE;
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &command_buffer;
+
+	result = vkQueueSubmit(compute_queue, 1, &submit_info, fence_compute_finish);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to submit queue");
+	}
 }
 
 void Program::write_output()
