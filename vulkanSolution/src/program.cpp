@@ -1,14 +1,24 @@
 #include "program.hpp"
+#include <arrow/io/file.h>
+#include <arrow/util/macros.h>
+#include <parquet/arrow/writer.h>
+#include <arrow/util/type_fwd.h>
 #include "parquet_loader.hpp"
 #include "record.hpp"
 #include <algorithm>
 #include <array>
+#include <arrow/buffer.h>
+#include <arrow/io/type_fwd.h>
+#include <arrow/result.h>
+#include <arrow/util/type_fwd.h>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <parquet/properties.h>
 #include <string>
 #include <vector>
 #include <vulkan/vk_platform.h>
@@ -408,12 +418,47 @@ void Program::calculate_next_set()
 
 void Program::write_output()
 {
+	//todo: move the bulk of this method into a seperate namespace that deals with arrow stuff
+	auto arrow_data_type = get_arrow_data_type();
+	auto result = arrow::AllocateBuffer(sizeof(record) * output_vec.size(), arrow::default_memory_pool());
+	if (result != arrow::Status::OK()) {
+		throw std::runtime_error("Failed to allocate buffer for arrow");
+	}
+	std::unique_ptr<arrow::Buffer> buffer = std::move(result.ValueUnsafe());
+	std::memcpy(buffer->mutable_data(), output_vec.data(), sizeof(record) * output_vec.size());
+
+	//todo: continue here, some error in creating the array need to rtfm
+	auto array = std::make_shared<arrow::StructArray>(arrow_data_type, output_vec.size(), buffer.get());
+	std::shared_ptr<arrow::ChunkedArray> chunked_array = std::make_shared<arrow::ChunkedArray>(array);
+
+	// Create arrow::Table from ChunkedArray
+	std::vector<std::shared_ptr<arrow::Field>> schema_vector = {arrow::field("column1", arrow_data_type)};
+	std::shared_ptr<arrow::Schema> schema = std::make_shared<arrow::Schema>(schema_vector);
+
+	std::shared_ptr<arrow::Table> table = arrow::Table::Make(schema, {chunked_array});
+	std::shared_ptr<parquet::WriterProperties> props = parquet::WriterProperties::Builder().compression(arrow::Compression::SNAPPY)->build();
+
+	auto file_result = arrow::io::FileOutputStream::Open("output.parquet");
+	if (file_result != arrow::Status::OK()) {
+		throw std::runtime_error("Failed to open output file");
+	}
+	std::shared_ptr<arrow::io::FileOutputStream> outfile = std::move(file_result.ValueUnsafe());
+
+	result = parquet::arrow::WriteTable(*table.get(), arrow::default_memory_pool(), outfile, 1024, props, nullptr);
+	if (result != arrow::Status::OK()) {
+		throw std::runtime_error("Failed to write parquet file");
+	}
 
 }
 
 void Program::copy_from_buffer()
 {
+	void *data;
+	vkMapMemory(logical_device, data_buffer_memory, 0, sizeof(record) * record_vec.size(), 0, &data);
+	memcpy(record_vec.data(), data, sizeof(record) * record_vec.size());
+	vkUnmapMemory(logical_device, data_buffer_memory);
 
+	output_vec.insert(output_vec.end(), record_vec.begin(), record_vec.end());
 }
 
 void Program::create_descriptor_pool()

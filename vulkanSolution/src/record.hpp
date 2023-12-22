@@ -1,31 +1,35 @@
-#pragma  once
+#pragma once
 #include <array>
+#include <arrow/type_fwd.h>
 #include <vulkan/vulkan_core.h>
-namespace mortgage_record {
-    struct record {
-	alignas(8)double index;
-	alignas(4)float interest_rate;
-	alignas(4)float remaining_notional;
-	alignas(4)float monthly_payment;
-	alignas(4)float repayment_payment;
-	alignas(4)float interest_payment;
-	alignas(4)float write_off;
-	alignas(4)int reset_frequency;
-	alignas(4)int risk_indicator;
-	alignas(4)int curr_date_offset;
-	alignas(4)int next_reset_date_offset;
-	alignas(4)int max_date_offset;
-	alignas(4)int payment_type;
+namespace mortgage_record
+{
+struct record {
+	alignas(8) double index;
+	alignas(4) float interest_rate;
+	alignas(4) float remaining_notional;
+	alignas(4) float monthly_payment;
+	alignas(4) float repayment_payment;
+	alignas(4) float interest_payment;
+	alignas(4) float write_off;
+	alignas(4) int reset_frequency;
+	alignas(4) int risk_indicator;
+	alignas(4) int curr_date_offset;
+	alignas(4) int next_reset_date_offset;
+	alignas(4) int max_date_offset;
+	alignas(4) int payment_type;
 
-	static VkVertexInputBindingDescription get_binding_description(void) {
-	    VkVertexInputBindingDescription binding_description = {};
-	    binding_description.binding = 0;
-	    binding_description.stride = sizeof(record);
-	    binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	    return binding_description;
+	static VkVertexInputBindingDescription get_binding_description(void)
+	{
+		VkVertexInputBindingDescription binding_description = {};
+		binding_description.binding = 0;
+		binding_description.stride = sizeof(record);
+		binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		return binding_description;
 	}
 
-	static std::array<VkVertexInputAttributeDescription, 13> get_attribute_description(void) {
+	static std::array<VkVertexInputAttributeDescription, 13> get_attribute_description(void)
+	{
 		std::array<VkVertexInputAttributeDescription, 13> attribute_description = {};
 
 		attribute_description[0].binding = 0;
@@ -95,5 +99,16 @@ namespace mortgage_record {
 
 		return attribute_description;
 	}
-    };
+};
+
+std::shared_ptr<arrow::DataType> get_arrow_data_type(void)
+{
+	return arrow::struct_({arrow::field("index", arrow::float64()), arrow::field("interest_rate", arrow::float32()),
+			       arrow::field("remaining_notional", arrow::float32()), arrow::field("monthly_payment", arrow::float32()),
+			       arrow::field("repayment_payment", arrow::float32()), arrow::field("interest_payment", arrow::float32()),
+			       arrow::field("write_off", arrow::float32()), arrow::field("reset_frequency", arrow::int32()),
+			       arrow::field("risk_indicator", arrow::int32()), arrow::field("curr_date_offset", arrow::int32()),
+			       arrow::field("next_reset_date_offset", arrow::int32()), arrow::field("max_date_offset", arrow::int32()),
+			       arrow::field("payment_type", arrow::int32())});
 }
+} // namespace mortgage_record
