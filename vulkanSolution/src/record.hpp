@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <arrow/type.h>
 #include <arrow/type_fwd.h>
 #include <vulkan/vulkan_core.h>
 namespace mortgage_record
@@ -99,16 +100,18 @@ struct record {
 
 		return attribute_description;
 	}
+
+	static std::shared_ptr<arrow::Schema> get_arrow_schema(void)
+	{
+		std::vector<std::shared_ptr<arrow::Field>> schema_vec = {arrow::field("index", arrow::float64()), arrow::field("interest_rate", arrow::float32()),
+				arrow::field("remaining_notional", arrow::float32()), arrow::field("monthly_payment", arrow::float32()),
+				arrow::field("repayment_payment", arrow::float32()), arrow::field("interest_payment", arrow::float32()),
+				arrow::field("write_off", arrow::float32()), arrow::field("reset_frequency", arrow::int32()),
+				arrow::field("risk_indicator", arrow::int32()), arrow::field("curr_date_offset", arrow::int32()),
+				arrow::field("next_reset_date_offset", arrow::int32()), arrow::field("max_date_offset", arrow::int32()),
+				arrow::field("payment_type", arrow::int32())};
+		return std::make_shared<arrow::Schema>(schema_vec);
+	}
 };
 
-std::shared_ptr<arrow::DataType> get_arrow_data_type(void)
-{
-	return arrow::struct_({arrow::field("index", arrow::float64()), arrow::field("interest_rate", arrow::float32()),
-			       arrow::field("remaining_notional", arrow::float32()), arrow::field("monthly_payment", arrow::float32()),
-			       arrow::field("repayment_payment", arrow::float32()), arrow::field("interest_payment", arrow::float32()),
-			       arrow::field("write_off", arrow::float32()), arrow::field("reset_frequency", arrow::int32()),
-			       arrow::field("risk_indicator", arrow::int32()), arrow::field("curr_date_offset", arrow::int32()),
-			       arrow::field("next_reset_date_offset", arrow::int32()), arrow::field("max_date_offset", arrow::int32()),
-			       arrow::field("payment_type", arrow::int32())});
-}
 } // namespace mortgage_record

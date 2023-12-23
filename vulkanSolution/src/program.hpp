@@ -31,7 +31,7 @@ class Program
 	std::vector<char> read_shader_file(const std::string &filename);
 	void calculate_next_set(void);
 	void copy_from_buffer(void);
-	void write_output(void);
+	arrow::Result<std::shared_ptr<arrow::Table>> write_output(void);
 	void create_command_buffer(void);
 	void create_descriptor_pool(void);
 	void create_descriptor_set(void);

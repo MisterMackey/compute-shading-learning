@@ -1,5 +1,8 @@
 #include "program.hpp"
 #include <arrow/io/file.h>
+#include <arrow/memory_pool.h>
+#include <arrow/status.h>
+#include <arrow/type_fwd.h>
 #include <arrow/util/macros.h>
 #include <parquet/arrow/writer.h>
 #include <arrow/util/type_fwd.h>
@@ -82,6 +85,7 @@ Program::~Program()
 void Program::run()
 {
 	copyDataToBufferMemory();
+	std::cout << "Starting compute shader" << std::endl;
 	// resize the output vector to its maximum allowed size, we can shrink at the end if needed
 	//  its resized to the amount of full sets, as each pass through the shader will get a full set of size record_vec.size() * sizeof(record)
 	size_t allowed_sets = MAX_BYTES_FOR_RESULT_SET / (sizeof(record) * record_vec.size());
@@ -102,11 +106,19 @@ void Program::run()
 		copy_from_buffer();
 		// check if we are at the max allowed sets, if so we trigger a write and clear the vector
 		if (i == allowed_sets) {
-			write_output();
+			std::cout << "Writing output" << std::endl;
+			auto result = write_output();
+			if (result != arrow::Status::OK()) {
+				throw std::runtime_error("Failed to write output");
+			}
 			output_vec.clear();
 		}
 	}
-	write_output();
+	std::cout << "Writing output" << std::endl;
+	auto result = write_output();
+	if (result != arrow::Status::OK()) {
+		throw std::runtime_error("Failed to write output");
+	}
 }
 
 void Program::create_vkInstance()
@@ -416,39 +428,82 @@ void Program::calculate_next_set()
 	}
 }
 
-void Program::write_output()
+arrow::Result<std::shared_ptr<arrow::Table>> Program::write_output()
 {
 	//todo: move the bulk of this method into a seperate namespace that deals with arrow stuff
-	auto arrow_data_type = get_arrow_data_type();
-	auto result = arrow::AllocateBuffer(sizeof(record) * output_vec.size(), arrow::default_memory_pool());
-	if (result != arrow::Status::OK()) {
-		throw std::runtime_error("Failed to allocate buffer for arrow");
+
+	//see https://arrow.apache.org/docs/cpp/examples/row_columnar_conversion.html
+	//only works on unix
+	arrow::MemoryPool* pool = arrow::default_memory_pool();
+	arrow::DoubleBuilder index_builder(pool);
+	arrow::FloatBuilder interest_rate_builder(pool);
+	arrow::FloatBuilder remaining_notional_builder(pool);
+	arrow::FloatBuilder monthly_payment_builder(pool);
+	arrow::FloatBuilder repayment_payment_builder(pool);
+	arrow::FloatBuilder interest_payment_builder(pool);
+	arrow::FloatBuilder write_off_builder(pool);
+	arrow::Int32Builder reset_frequency_builder(pool);
+	arrow::Int32Builder risk_indicator_builder(pool);
+	arrow::Int32Builder curr_date_offset_builder(pool);
+	arrow::Int32Builder next_reset_date_offset_builder(pool);
+	arrow::Int32Builder max_date_offset_builder(pool);
+	arrow::Int32Builder payment_type_builder(pool);
+
+	for (const auto& record : output_vec) {
+		ARROW_RETURN_NOT_OK(index_builder.Append(record.index));
+		ARROW_RETURN_NOT_OK(interest_rate_builder.Append(record.interest_rate));
+		ARROW_RETURN_NOT_OK(remaining_notional_builder.Append(record.remaining_notional));
+		ARROW_RETURN_NOT_OK(monthly_payment_builder.Append(record.monthly_payment));
+		ARROW_RETURN_NOT_OK(repayment_payment_builder.Append(record.repayment_payment));
+		ARROW_RETURN_NOT_OK(interest_payment_builder.Append(record.interest_payment));
+		ARROW_RETURN_NOT_OK(write_off_builder.Append(record.write_off));
+		ARROW_RETURN_NOT_OK(reset_frequency_builder.Append(record.reset_frequency));
+		ARROW_RETURN_NOT_OK(risk_indicator_builder.Append(record.risk_indicator));
+		ARROW_RETURN_NOT_OK(curr_date_offset_builder.Append(record.curr_date_offset));
+		ARROW_RETURN_NOT_OK(next_reset_date_offset_builder.Append(record.next_reset_date_offset));
+		ARROW_RETURN_NOT_OK(max_date_offset_builder.Append(record.max_date_offset));
+		ARROW_RETURN_NOT_OK(payment_type_builder.Append(record.payment_type));
 	}
-	std::unique_ptr<arrow::Buffer> buffer = std::move(result.ValueUnsafe());
-	std::memcpy(buffer->mutable_data(), output_vec.data(), sizeof(record) * output_vec.size());
+	std::shared_ptr<arrow::Array> index_array;
+	std::shared_ptr<arrow::Array> interest_rate_array;
+	std::shared_ptr<arrow::Array> remaining_notional_array;
+	std::shared_ptr<arrow::Array> monthly_payment_array;
+	std::shared_ptr<arrow::Array> repayment_payment_array;
+	std::shared_ptr<arrow::Array> interest_payment_array;
+	std::shared_ptr<arrow::Array> write_off_array;
+	std::shared_ptr<arrow::Array> reset_frequency_array;
+	std::shared_ptr<arrow::Array> risk_indicator_array;
+	std::shared_ptr<arrow::Array> curr_date_offset_array;
+	std::shared_ptr<arrow::Array> next_reset_date_offset_array;
+	std::shared_ptr<arrow::Array> max_date_offset_array;
+	std::shared_ptr<arrow::Array> payment_type_array;
 
-	//todo: continue here, some error in creating the array need to rtfm
-	auto array = std::make_shared<arrow::StructArray>(arrow_data_type, output_vec.size(), buffer.get());
-	std::shared_ptr<arrow::ChunkedArray> chunked_array = std::make_shared<arrow::ChunkedArray>(array);
+	ARROW_RETURN_NOT_OK(index_builder.Finish(&index_array));
+	ARROW_RETURN_NOT_OK(interest_rate_builder.Finish(&interest_rate_array));
+	ARROW_RETURN_NOT_OK(remaining_notional_builder.Finish(&remaining_notional_array));
+	ARROW_RETURN_NOT_OK(monthly_payment_builder.Finish(&monthly_payment_array));
+	ARROW_RETURN_NOT_OK(repayment_payment_builder.Finish(&repayment_payment_array));
+	ARROW_RETURN_NOT_OK(interest_payment_builder.Finish(&interest_payment_array));
+	ARROW_RETURN_NOT_OK(write_off_builder.Finish(&write_off_array));
+	ARROW_RETURN_NOT_OK(reset_frequency_builder.Finish(&reset_frequency_array));
+	ARROW_RETURN_NOT_OK(risk_indicator_builder.Finish(&risk_indicator_array));
+	ARROW_RETURN_NOT_OK(curr_date_offset_builder.Finish(&curr_date_offset_array));
+	ARROW_RETURN_NOT_OK(next_reset_date_offset_builder.Finish(&next_reset_date_offset_array));
+	ARROW_RETURN_NOT_OK(max_date_offset_builder.Finish(&max_date_offset_array));
+	ARROW_RETURN_NOT_OK(payment_type_builder.Finish(&payment_type_array));
 
-	// Create arrow::Table from ChunkedArray
-	std::vector<std::shared_ptr<arrow::Field>> schema_vector = {arrow::field("column1", arrow_data_type)};
-	std::shared_ptr<arrow::Schema> schema = std::make_shared<arrow::Schema>(schema_vector);
+	auto schema = record::get_arrow_schema();
+	std::shared_ptr<arrow::Table> table = arrow::Table::Make(schema, {index_array, interest_rate_array, remaining_notional_array, monthly_payment_array,
+		repayment_payment_array, interest_payment_array, write_off_array, reset_frequency_array, risk_indicator_array, curr_date_offset_array,
+		next_reset_date_offset_array, max_date_offset_array, payment_type_array});
 
-	std::shared_ptr<arrow::Table> table = arrow::Table::Make(schema, {chunked_array});
+	//now we write the table
 	std::shared_ptr<parquet::WriterProperties> props = parquet::WriterProperties::Builder().compression(arrow::Compression::SNAPPY)->build();
-
-	auto file_result = arrow::io::FileOutputStream::Open("output.parquet");
-	if (file_result != arrow::Status::OK()) {
-		throw std::runtime_error("Failed to open output file");
-	}
-	std::shared_ptr<arrow::io::FileOutputStream> outfile = std::move(file_result.ValueUnsafe());
-
-	result = parquet::arrow::WriteTable(*table.get(), arrow::default_memory_pool(), outfile, 1024, props, nullptr);
-	if (result != arrow::Status::OK()) {
-		throw std::runtime_error("Failed to write parquet file");
-	}
-
+	std::shared_ptr<parquet::ArrowWriterProperties> arrow_props = parquet::ArrowWriterProperties::Builder().store_schema()->build();
+	std::shared_ptr<arrow::io::FileOutputStream> outfile;
+	ARROW_ASSIGN_OR_RAISE(outfile, arrow::io::FileOutputStream::Open("output.parquet"));
+	ARROW_RETURN_NOT_OK(parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile, 64000, props, arrow_props));
+	return table;
 }
 
 void Program::copy_from_buffer()
