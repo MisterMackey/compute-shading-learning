@@ -24,6 +24,7 @@
 #include <memory>
 #include <parquet/properties.h>
 #include <string>
+#include <thread>
 #include <vector>
 #include <vulkan/vk_platform.h>
 #include <vulkan/vulkan_core.h>
@@ -452,7 +453,6 @@ arrow::Result<std::shared_ptr<arrow::Table>> Program::write_output()
 
 	std::cout.imbue(std::locale(""));
 	std::cout << "Writing " << output_vec.size() << " records" << std::endl;
-	int i = 0;
 
 	ARROW_RETURN_NOT_OK(index_builder.Resize(output_vec.size()));
 	ARROW_RETURN_NOT_OK(interest_rate_builder.Resize(output_vec.size()));
@@ -470,24 +470,57 @@ arrow::Result<std::shared_ptr<arrow::Table>> Program::write_output()
 
 
 
-	for (const auto& record : output_vec) {
-		ARROW_RETURN_NOT_OK(index_builder.Append(record.index));
-		ARROW_RETURN_NOT_OK(interest_rate_builder.Append(record.interest_rate));
-		ARROW_RETURN_NOT_OK(remaining_notional_builder.Append(record.remaining_notional));
-		ARROW_RETURN_NOT_OK(monthly_payment_builder.Append(record.monthly_payment));
-		ARROW_RETURN_NOT_OK(repayment_payment_builder.Append(record.repayment_payment));
-		ARROW_RETURN_NOT_OK(interest_payment_builder.Append(record.interest_payment));
-		ARROW_RETURN_NOT_OK(write_off_builder.Append(record.write_off));
-		ARROW_RETURN_NOT_OK(reset_frequency_builder.Append(record.reset_frequency));
-		ARROW_RETURN_NOT_OK(risk_indicator_builder.Append(record.risk_indicator));
-		ARROW_RETURN_NOT_OK(curr_date_offset_builder.Append(record.curr_date_offset));
-		ARROW_RETURN_NOT_OK(next_reset_date_offset_builder.Append(record.next_reset_date_offset));
-		ARROW_RETURN_NOT_OK(max_date_offset_builder.Append(record.max_date_offset));
-		ARROW_RETURN_NOT_OK(payment_type_builder.Append(record.payment_type));
-		if (++i % 100000 == 0) {
-			std::cout << "Appending record " << i << std::endl;
+	//fixme make this not depend on someone have 6 threads available
+	std::vector<std::thread> threads;
+	threads.push_back(std::thread([&](){
+		for (size_t i = 0; i < output_vec.size(); i++) {
+			ARROW_RETURN_NOT_OK(index_builder.Append(output_vec[i].index));
+			ARROW_RETURN_NOT_OK(interest_rate_builder.Append(output_vec[i].interest_rate));
+			ARROW_RETURN_NOT_OK(next_reset_date_offset_builder.Append(output_vec[i].next_reset_date_offset));
 		}
+		return arrow::Status::OK();
+	}));
+	threads.push_back(std::thread([&](){
+		for (size_t i = 0; i < output_vec.size(); i++) {
+			ARROW_RETURN_NOT_OK(remaining_notional_builder.Append(output_vec[i].remaining_notional));
+			ARROW_RETURN_NOT_OK(monthly_payment_builder.Append(output_vec[i].monthly_payment));
+		}
+		return arrow::Status::OK();
+	}));
+	threads.push_back(std::thread([&](){
+		for (size_t i = 0; i < output_vec.size(); i++) {
+			ARROW_RETURN_NOT_OK(repayment_payment_builder.Append(output_vec[i].repayment_payment));
+			ARROW_RETURN_NOT_OK(interest_payment_builder.Append(output_vec[i].interest_payment));
+		}
+		return arrow::Status::OK();
+	}));
+	threads.push_back(std::thread([&](){
+		for (size_t i = 0; i < output_vec.size(); i++) {
+			ARROW_RETURN_NOT_OK(write_off_builder.Append(output_vec[i].write_off));
+			ARROW_RETURN_NOT_OK(reset_frequency_builder.Append(output_vec[i].reset_frequency));
+		}
+		return arrow::Status::OK();
+	}));
+	threads.push_back(std::thread([&](){
+		for (size_t i = 0; i < output_vec.size(); i++) {
+			ARROW_RETURN_NOT_OK(risk_indicator_builder.Append(output_vec[i].risk_indicator));
+			ARROW_RETURN_NOT_OK(curr_date_offset_builder.Append(output_vec[i].curr_date_offset));
+		}
+		return arrow::Status::OK();
+	}));
+	threads.push_back(std::thread([&](){
+		for (size_t i = 0; i < output_vec.size(); i++) {
+			ARROW_RETURN_NOT_OK(max_date_offset_builder.Append(output_vec[i].max_date_offset));
+			ARROW_RETURN_NOT_OK(payment_type_builder.Append(output_vec[i].payment_type));
+		}
+		return arrow::Status::OK();
+	}));
+
+	std::cout << "Waiting for threads to finish" << std::endl;
+	for (auto &thread : threads) {
+		thread.join();
 	}
+
 	std::cout << "Finalizing arrays" << std::endl;
 	output_vec.clear();
 	output_vec.resize(0);
