@@ -4,6 +4,7 @@
 #include <arrow/status.h>
 #include <arrow/type_fwd.h>
 #include <arrow/util/macros.h>
+#include <locale>
 #include <parquet/arrow/writer.h>
 #include <arrow/util/type_fwd.h>
 #include "parquet_loader.hpp"
@@ -449,6 +450,26 @@ arrow::Result<std::shared_ptr<arrow::Table>> Program::write_output()
 	arrow::Int32Builder max_date_offset_builder(pool);
 	arrow::Int32Builder payment_type_builder(pool);
 
+	std::cout.imbue(std::locale(""));
+	std::cout << "Writing " << output_vec.size() << " records" << std::endl;
+	int i = 0;
+
+	ARROW_RETURN_NOT_OK(index_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(interest_rate_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(remaining_notional_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(monthly_payment_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(repayment_payment_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(interest_payment_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(write_off_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(reset_frequency_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(risk_indicator_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(curr_date_offset_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(next_reset_date_offset_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(max_date_offset_builder.Resize(output_vec.size()));
+	ARROW_RETURN_NOT_OK(payment_type_builder.Resize(output_vec.size()));
+
+
+
 	for (const auto& record : output_vec) {
 		ARROW_RETURN_NOT_OK(index_builder.Append(record.index));
 		ARROW_RETURN_NOT_OK(interest_rate_builder.Append(record.interest_rate));
@@ -463,7 +484,15 @@ arrow::Result<std::shared_ptr<arrow::Table>> Program::write_output()
 		ARROW_RETURN_NOT_OK(next_reset_date_offset_builder.Append(record.next_reset_date_offset));
 		ARROW_RETURN_NOT_OK(max_date_offset_builder.Append(record.max_date_offset));
 		ARROW_RETURN_NOT_OK(payment_type_builder.Append(record.payment_type));
+		if (++i % 100000 == 0) {
+			std::cout << "Appending record " << i << std::endl;
+		}
 	}
+	std::cout << "Finalizing arrays" << std::endl;
+	output_vec.clear();
+	output_vec.resize(0);
+	record_vec.clear();
+	record_vec.resize(0);
 	std::shared_ptr<arrow::Array> index_array;
 	std::shared_ptr<arrow::Array> interest_rate_array;
 	std::shared_ptr<arrow::Array> remaining_notional_array;
@@ -498,8 +527,9 @@ arrow::Result<std::shared_ptr<arrow::Table>> Program::write_output()
 		next_reset_date_offset_array, max_date_offset_array, payment_type_array});
 
 	//now we write the table
+	std::cout << "Starting write" << std::endl;
 	std::shared_ptr<parquet::WriterProperties> props = parquet::WriterProperties::Builder().compression(arrow::Compression::SNAPPY)->build();
-	std::shared_ptr<parquet::ArrowWriterProperties> arrow_props = parquet::ArrowWriterProperties::Builder().store_schema()->build();
+	std::shared_ptr<parquet::ArrowWriterProperties> arrow_props = parquet::ArrowWriterProperties::Builder().build();
 	std::shared_ptr<arrow::io::FileOutputStream> outfile;
 	ARROW_ASSIGN_OR_RAISE(outfile, arrow::io::FileOutputStream::Open("output.parquet"));
 	ARROW_RETURN_NOT_OK(parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), outfile, 64000, props, arrow_props));
